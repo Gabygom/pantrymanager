@@ -10,21 +10,24 @@ def fetch_inventory_grouped_by_location():
     conn = connect_db()
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT l.location_id, l.location_name, i.name, inv.quantity, inv.expiration_date
+        SELECT l.location_id, l.location_name, i.name, inv.quantity, inv.expiration_date, inv.inventory_id
         FROM Locations l
         LEFT JOIN Inventory inv ON inv.location_id = l.location_id
         LEFT JOIN Items i ON inv.item_id = i.item_id
         ORDER BY l.location_name
     ''')
+    
     rows = cursor.fetchall()
     conn.close()
 
     inventory_by_location = {}
-    for loc_id, location, name, qty, exp_date in rows:
+
+    for loc_id, location, name, qty, exp_date, inv_id in rows:
         if location not in inventory_by_location:
             inventory_by_location[location] = []
         if name:
-            inventory_by_location[location].append((name, qty, exp_date))
+            inventory_by_location[location].append((name, qty, exp_date, inv_id))
+            
     return inventory_by_location
 
 #Add item
@@ -134,8 +137,26 @@ def display_inventory():
         tree.heading("Expiration", text="Expiration Date")
         tree.pack(fill="x")
 
-        for item, qty, exp in items:
-            tree.insert("", "end", values=(item, qty, exp))
+        for item, qty, exp, inv_id in items:
+           tree.insert("", "end", values=(item, qty, exp), tags=(str(inv_id),))
+
+        #Delete button
+        delete_btn = tk.Button(frame, text="Delete Selected", command=lambda t=tree: delete_selected_item(t))
+        delete_btn.pack(pady=5)
+
+def delete_selected_item(tree):
+    selected = tree.selection()
+    if not selected:
+        return
+    inv_id = tree.item(selected[0], "tags")[0]
+    confirm = messagebox.askyesno("Delete", "Are you sure you want to delete this item?")
+    if confirm:
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM Inventory WHERE inventory_id = ?", (inv_id,))
+        conn.commit()
+        conn.close()
+        tree.delete(selected[0])  # remove from UI
 
     
 app = tk.Tk()
