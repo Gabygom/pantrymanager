@@ -1,10 +1,11 @@
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, ttk, simpledialog
 import sqlite3
 from datetime import datetime
 
 def connect_db():
     return sqlite3.connect("../sql/project1.db")
+
         
 def fetch_inventory_grouped_by_location():
     conn = connect_db()
@@ -29,6 +30,7 @@ def fetch_inventory_grouped_by_location():
             inventory_by_location[location].append((name, qty, exp_date, inv_id))
             
     return inventory_by_location
+
 
 #Add item
 def open_add_item_window():
@@ -99,7 +101,7 @@ def open_add_item_window():
         # Check if item already exists
         cursor.execute("SELECT item_id FROM Items WHERE name = ?", (name,))
         row = cursor.fetchone()
-        now = datetime.now().date()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if row:
             item_id = row[0]
         else:            
@@ -140,10 +142,18 @@ def display_inventory():
         for item, qty, exp, inv_id in items:
            tree.insert("", "end", values=(item, qty, exp), tags=(str(inv_id),))
 
-        #Delete button
-        delete_btn = tk.Button(frame, text="Delete Selected", command=lambda t=tree: delete_selected_item(t))
-        delete_btn.pack(pady=5)
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(pady=5)
 
+        #Delete btn
+        delete_btn = tk.Button(btn_frame, text="Delete Selected", command=lambda t=tree: delete_selected_item(t))
+        delete_btn.pack(side="left", padx=5)
+
+        #Edit Quantity btn
+        edit_btn = tk.Button(btn_frame, text="Edit Quantity", command=lambda t=tree: edit_quantity(t))
+        edit_btn.pack(side="left", padx=5)
+
+#Delete an item from INVENTORY
 def delete_selected_item(tree):
     selected = tree.selection()
     if not selected:
@@ -156,8 +166,38 @@ def delete_selected_item(tree):
         cursor.execute("DELETE FROM Inventory WHERE inventory_id = ?", (inv_id,))
         conn.commit()
         conn.close()
-        tree.delete(selected[0])  # remove from UI
+        tree.delete(selected[0])
+        messagebox.showinfo("Success", "Item deleted successfully!")
+    else:
+        messagebox.showwarning("No Selection", "No items deleted")
 
+#Edit an item from INVENTORY
+def edit_quantity(tree):
+    selected_item = tree.selection()
+    if selected_item:
+        inv_id = tree.item(selected_item[0], 'tags')[0]
+        old_qty = tree.item(selected_item[0], 'values')[1]
+
+        # Prompt user to enter new quantity
+        new_qty = simpledialog.askinteger("Edit Quantity", f"Enter new quantity for item (current: {old_qty}):", initialvalue=old_qty, minvalue=0)
+        
+        if new_qty is not None:
+            conn = connect_db()
+            cursor = conn.cursor()
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            # Update the quantity in the database
+            cursor.execute("UPDATE Inventory SET quantity = ?, updated_at = ? WHERE inventory_id = ?", (new_qty, now, inv_id))
+            conn.commit()
+            conn.close()
+
+            # Update the quantity in the Treeview
+            tree.item(selected_item[0], values=(tree.item(selected_item[0], 'values')[0], new_qty, tree.item(selected_item[0], 'values')[2]))
+
+            messagebox.showinfo("Success", "Quantity updated successfully!")
+    else:
+        messagebox.showwarning("No Selection", "Please select an item to edit.")
+        
     
 app = tk.Tk()
 app.title("Fridge & Pantry Manager")
