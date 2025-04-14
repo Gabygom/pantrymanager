@@ -122,6 +122,37 @@ def open_add_item_window():
 
     tk.Button(add_window, text="Add Item", command=submit_item).pack(pady=10)
 
+#Add category
+def open_add_category_window():
+    cat_window = tk.Toplevel(app)
+    cat_window.title("Add New Category")
+    cat_window.geometry("300x150")
+
+    tk.Label(cat_window, text="Category Name").pack(pady=5)
+    category_entry = tk.Entry(cat_window)
+    category_entry.pack()
+
+    def submit_category():
+        name = category_entry.get().strip()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if not name:
+            messagebox.showwarning("Missing Data", "Category name cannot be empty.")
+            return
+        
+        try:
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO Categories (category_name, created_at) VALUES (?, ?)", (name,now))
+            conn.commit()
+            conn.close()
+            messagebox.showinfo("Success", f"Category '{name}' added!")
+            cat_window.destroy()
+            display_categories()
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Error", f"Category '{name}' already exists.")
+
+    tk.Button(cat_window, text="Add Category", command=submit_category).pack(pady=10)
+    
 
 # Load and show inventory
 def display_inventory():
@@ -197,17 +228,57 @@ def edit_quantity(tree):
             messagebox.showinfo("Success", "Quantity updated successfully!")
     else:
         messagebox.showwarning("No Selection", "Please select an item to edit.")
+
+#Display all categories
+def fetch_categories():
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT category_name FROM Categories ORDER BY category_name")
+    categories = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return categories
+
+def display_categories():
+    for widget in categories_frame.winfo_children():
+        widget.destroy()
+    for cat in fetch_categories():
+        label = tk.Label(categories_frame, text=cat)
+        label.pack(anchor="w")
         
-    
+
 app = tk.Tk()
 app.title("Fridge & Pantry Manager")
 app.geometry("700x600")
 
+top_button_frame = tk.Frame(app)
+top_button_frame.pack(pady=10)
+
+#Add btn
+add_button = tk.Button(top_button_frame, text="Add New Item", command=open_add_item_window)
+add_button.pack(side="left", padx=5)
+
+#Add category
+add_category_button = tk.Button(top_button_frame, text="Add Category", command=open_add_category_window)
+add_category_button.pack(side="left", padx=5)
+
+
 # Scrollbar
-container = ttk.Frame(app)
-container.pack(fill="both", expand=True)
+
+main_frame = tk.Frame(app)
+main_frame.pack(fill="both", expand=True)
+
+# Sidebar for categories
+categories_frame = tk.LabelFrame(main_frame, text="Categories", padx=10, pady=10)
+categories_frame.pack(side="left", fill="y", padx=10, pady=10)
+
+# Inventory
+container = ttk.Frame(main_frame)
+container.pack(side="right", fill="both", expand=True)
+
 
 canvas = tk.Canvas(container)
+
+#Scrollbar
 scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
 scrollable_frame = ttk.Frame(canvas)
 
@@ -224,11 +295,10 @@ canvas.configure(yscrollcommand=scrollbar.set)
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
-#Add item button
-add_button = tk.Button(app, text="Add New Item", command=open_add_item_window)
-add_button.pack(pady=10)
+
 
 display_inventory()
+display_categories()
 
 
 app.mainloop()
