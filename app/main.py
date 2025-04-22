@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk, simpledialog
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def connect_db():
     return sqlite3.connect("../sql/project1.db")
@@ -247,6 +247,53 @@ def display_categories():
         label.pack(anchor="w")
         label.bind("<Button-1>", lambda e, c=cat: open_category_window(c))
 
+#Select Category and show items
+def open_category_window(category_name):
+    window = tk.Toplevel(app)
+    window.title(f"Items in '{category_name}'")
+    window.geometry("800x300")
+
+    tree = ttk.Treeview(window, columns=("Item", "Quantity", "Expiration", "Location"), show="headings")
+    tree.heading("Item", text="Item")
+    tree.heading("Quantity", text="Quantity")
+    tree.heading("Expiration", text="Expiration")
+    tree.heading("Location", text="Location")
+    tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+    # Define tag styles
+    tree.tag_configure("expired", background="#ffc2c2")   # Light red
+    tree.tag_configure("soon", background="#fff3b0")      # Light yellow
+
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT i.name, inv.quantity, inv.expiration_date, l.location_name
+        FROM Items i
+        JOIN Categories c ON i.category_id = c.category_id
+        JOIN Inventory inv ON inv.item_id = i.item_id
+        JOIN Locations l ON inv.location_id = l.location_id
+        WHERE c.category_name = ?
+        ORDER BY i.name
+    ''', (category_name,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    today = datetime.now().date()
+    soon_date = today + timedelta(days=2)
+
+    for name, qty, exp, loc in rows:
+        tag = ""
+        if exp:
+            try:
+                exp_date = datetime.strptime(exp, "%Y-%m-%d").date()
+                if exp_date <= today:
+                    tag = "expired"
+                elif exp_date <= soon_date:
+                    tag = "soon"
+            except ValueError:
+                pass  # Invalid date format
+        tree.insert("", "end", values=(name, qty, exp, loc), tags=(tag,))
+
         
 
 app = tk.Tk()
@@ -297,37 +344,6 @@ canvas.configure(yscrollcommand=scrollbar.set)
 
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
-
-#Select Category and show items
-def open_category_window(category_name):
-    window = tk.Toplevel(app)
-    window.title(f"Items in '{category_name}'")
-    window.geometry("800x300")
-
-    tree = ttk.Treeview(window, columns=("Item", "Quantity", "Expiration", "Location"), show="headings")
-    tree.heading("Item", text="Item")
-    tree.heading("Quantity", text="Quantity")
-    tree.heading("Expiration", text="Expiration")
-    tree.heading("Location", text="Location")
-    tree.pack(fill="both", expand=True, padx=10, pady=10)
-
-    conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT i.name, inv.quantity, inv.expiration_date, l.location_name
-        FROM Items i
-        JOIN Categories c ON i.category_id = c.category_id
-        JOIN Inventory inv ON inv.item_id = i.item_id
-        JOIN Locations l ON inv.location_id = l.location_id
-        WHERE c.category_name = ?
-        ORDER BY i.name
-    ''', (category_name,))
-    rows = cursor.fetchall()
-    conn.close()
-
-    for name, qty, exp, loc in rows:
-        tree.insert("", "end", values=(name, qty, exp, loc))
-
 
 display_inventory()
 display_categories()
