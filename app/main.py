@@ -170,17 +170,31 @@ def display_inventory():
         tree.heading("Expiration", text="Expiration Date")
         tree.pack(fill="x")
 
+        # Configure tags for colors
+        tree.tag_configure("expired", background="#ffcccc")     # Red
+        tree.tag_configure("soon", background="#fff3cd")        # Yellow
+
         for item, qty, exp, inv_id in items:
-           tree.insert("", "end", values=(item, qty, exp), tags=(str(inv_id),))
+            tag = ""
+            if exp:
+                try:
+                    exp_date = datetime.strptime(exp, "%Y-%m-%d")
+                    today = datetime.today()
+                    if exp_date < today:
+                        tag = "expired"
+                    elif exp_date <= today + timedelta(days=2):
+                        tag = "soon"
+                except:
+                    pass  # Invalid date format
+
+            tree.insert("", "end", values=(item, qty, exp), tags=(tag, str(inv_id)))
 
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(pady=5)
 
-        #Delete btn
         delete_btn = tk.Button(btn_frame, text="Delete Selected", command=lambda t=tree: delete_selected_item(t))
         delete_btn.pack(side="left", padx=5)
 
-        #Edit Quantity btn
         edit_btn = tk.Button(btn_frame, text="Edit Quantity", command=lambda t=tree: edit_quantity(t))
         edit_btn.pack(side="left", padx=5)
 
