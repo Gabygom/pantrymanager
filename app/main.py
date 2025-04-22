@@ -241,14 +241,17 @@ def fetch_categories():
 def display_categories():
     for widget in categories_frame.winfo_children():
         widget.destroy()
+
     for cat in fetch_categories():
-        label = tk.Label(categories_frame, text=cat)
+        label = tk.Label(categories_frame, text=cat, fg="blue", cursor="hand2")
         label.pack(anchor="w")
+        label.bind("<Button-1>", lambda e, c=cat: open_category_window(c))
+
         
 
 app = tk.Tk()
 app.title("Fridge & Pantry Manager")
-app.geometry("700x600")
+app.geometry("800x600")
 
 top_button_frame = tk.Frame(app)
 top_button_frame.pack(pady=10)
@@ -295,6 +298,35 @@ canvas.configure(yscrollcommand=scrollbar.set)
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
+#Select Category and show items
+def open_category_window(category_name):
+    window = tk.Toplevel(app)
+    window.title(f"Items in '{category_name}'")
+    window.geometry("800x300")
+
+    tree = ttk.Treeview(window, columns=("Item", "Quantity", "Expiration", "Location"), show="headings")
+    tree.heading("Item", text="Item")
+    tree.heading("Quantity", text="Quantity")
+    tree.heading("Expiration", text="Expiration")
+    tree.heading("Location", text="Location")
+    tree.pack(fill="both", expand=True, padx=10, pady=10)
+
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT i.name, inv.quantity, inv.expiration_date, l.location_name
+        FROM Items i
+        JOIN Categories c ON i.category_id = c.category_id
+        JOIN Inventory inv ON inv.item_id = i.item_id
+        JOIN Locations l ON inv.location_id = l.location_id
+        WHERE c.category_name = ?
+        ORDER BY i.name
+    ''', (category_name,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    for name, qty, exp, loc in rows:
+        tree.insert("", "end", values=(name, qty, exp, loc))
 
 
 display_inventory()
