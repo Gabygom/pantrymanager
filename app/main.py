@@ -39,8 +39,33 @@ def open_add_item_window():
     add_window.geometry("400x400")
 
     tk.Label(add_window, text="Item Name").pack()
-    item_name_entry = tk.Entry(add_window)
+    item_name_var = tk.StringVar()
+    item_name_entry = ttk.Combobox(add_window, textvariable=item_name_var)
+    
+    def update_autocomplete(event):
+        if event.keysym in ("BackSpace", "Delete", "Left", "Right", "Up", "Down", "Escape", "Shift_L", "Shift_R", "Control_L", "Control_R"):
+            return #Problem when trying to delete: don't autocomplete
+
+        typed = item_name_var.get()
+        if not typed:
+            item_name_entry['values'] = item_names
+            return
+
+        matches = [name for name in item_names if name.lower().startswith(typed.lower())]
+
+        if matches:
+            current_pos = item_name_entry.index(tk.INSERT)
+            item_name_entry.delete(0, tk.END)
+            item_name_entry.insert(0, matches[0])
+            item_name_entry.selection_range(current_pos, tk.END)
+
+        else:
+            item_name_entry['values'] = item_names
+
+
     item_name_entry.pack()
+    item_name_entry.bind('<KeyRelease>', update_autocomplete)
+    item_name_entry.event_generate('<Down>')
 
     tk.Label(add_window, text="Category").pack()
     category_var = tk.StringVar()
@@ -68,6 +93,9 @@ def open_add_item_window():
     categories = cursor.fetchall()
     cursor.execute("SELECT location_id, location_name FROM Locations")
     locations = cursor.fetchall()
+    cursor.execute("SELECT DISTINCT name FROM Items ORDER BY name COLLATE NOCASE")
+    item_names = [row[0] for row in cursor.fetchall()]
+    item_name_entry["values"] = item_names
     conn.close()
 
     category_menu["values"] = [name for _, name in categories]
@@ -75,7 +103,7 @@ def open_add_item_window():
 
     
     def submit_item():
-        name = item_name_entry.get().strip()
+        name = item_name_var.get().strip()
         category_name = category_var.get()
         location_name = location_var.get()
         quantity = quantity_entry.get()
@@ -280,6 +308,7 @@ def open_category_window(category_name):
     tree.heading("Expiration", text="Expiration")
     tree.heading("Location", text="Location")
     tree.pack(fill="both", expand=True, padx=10, pady=10)
+    tree.bind("<Button-1>", lambda event, t=tree: clear_selection(event, t))
 
     # Define tag styles
     tree.tag_configure("expired", background="#ffc2c2")   # Light red
