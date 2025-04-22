@@ -169,6 +169,7 @@ def display_inventory():
         tree.heading("Quantity", text="Quantity")
         tree.heading("Expiration", text="Expiration Date")
         tree.pack(fill="x")
+        tree.bind("<Button-1>", lambda event, t=tree: clear_selection(event, t))
 
         # Configure tags for colors
         tree.tag_configure("expired", background="#ffcccc")     # Red
@@ -197,6 +198,12 @@ def display_inventory():
 
         edit_btn = tk.Button(btn_frame, text="Edit Quantity", command=lambda t=tree: edit_quantity(t))
         edit_btn.pack(side="left", padx=5)
+
+#Clear selection to see colors
+def clear_selection(event, tree):
+    region = tree.identify("region", event.x, event.y)
+    if region != "cell":
+        tree.selection_remove(tree.selection())
 
 #Delete an item from INVENTORY
 def delete_selected_item(tree):
